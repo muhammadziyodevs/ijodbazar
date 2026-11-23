@@ -1,0 +1,6 @@
+{
+  "name": "IjodBaza",
+  "description": "Fayllar va bajarilgan ishlarni Firebase'da saqlash, shaxsiy kabinet, boshqaruv paneli va hamjamiyat platformasi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,349 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'ziyonur.kuknut@gmail.com';
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserPrivate(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 256
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.photoURL is string && data.photoURL.size() <= 1000
+        && data.bio is string && data.bio.size() <= 400
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPublicProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'photoURL', 'bio', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'photoURL', 'bio', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.photoURL is string && data.photoURL.size() <= 1000
+        && data.bio is string && data.bio.size() <= 400
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWorkItem(data) {
+      return data.keys().hasAll([
+          'id', 'authorId', 'authorName', 'authorPhotoURL', 'title', 'description',
+          'category', 'visibility', 'fileName', 'mimeType', 'fileSize', 'chunkCount',
+          'previewDataUrl', 'externalUrl', 'likesCount', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'authorId', 'authorName', 'authorPhotoURL', 'title', 'description',
+          'category', 'visibility', 'fileName', 'mimeType', 'fileSize', 'chunkCount',
+          'previewDataUrl', 'externalUrl', 'likesCount', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.authorId)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 100
+        && data.authorPhotoURL is string && data.authorPhotoURL.size() <= 1000
+        && data.title is string && data.title.size() >= 2 && data.title.size() <= 140
+        && data.description is string && data.description.size() <= 2000
+        && data.category in ['design', 'code', 'document', 'media', 'other']
+        && data.visibility in ['public', 'private']
+        && data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 255
+        && data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 128
+        && data.fileSize is int && data.fileSize >= 0 && data.fileSize <= 5242880
+        && data.chunkCount is int && data.chunkCount >= 0 && data.chunkCount <= 10
+        && data.previewDataUrl is string && data.previewDataUrl.size() <= 250000
+        && data.externalUrl is string && data.externalUrl.size() <= 1000
+        && data.likesCount is int && data.likesCount >= 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFileChunk(data) {
+      return data.keys().hasAll(['workId', 'authorId', 'index', 'data', 'createdAt'])
+        && data.keys().hasOnly(['workId', 'authorId', 'index', 'data', 'createdAt'])
+        && isValidId(data.workId)
+        && isValidId(data.authorId)
+        && data.index is int && data.index >= 0 && data.index < 10
+        && data.data is string && data.data.size() >= 1 && data.data.size() <= 750000
+        && data.createdAt is timestamp;
+    }
+
+    function isValidWorkLike(data) {
+      return data.keys().hasAll(['userId', 'workId', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'workId', 'createdAt'])
+        && isValidId(data.userId)
+        && isValidId(data.workId)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidWorkComment(data) {
+      return data.keys().hasAll(['id', 'workId', 'authorId', 'authorName', 'authorPhotoURL', 'workVisibility', 'text', 'createdAt'])
+        && data.keys().hasOnly(['id', 'workId', 'authorId', 'authorName', 'authorPhotoURL', 'workVisibility', 'text', 'createdAt'])
+        && isValidId(data.id)
+        && isValidId(data.workId)
+        && isValidId(data.authorId)
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 100
+        && data.authorPhotoURL is string && data.authorPhotoURL.size() <= 1000
+        && data.workVisibility in ['public', 'private']
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 1000
+        && data.createdAt is timestamp;
+    }
+
+    // --- Collection: Private Users (PII Isolated) ---
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUserPrivate(incoming())
+        && isOwner(userId)
+        && incoming().uid == userId
+        && incoming().email == request.auth.token.email
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUserPrivate(incoming())
+        && (isOwner(userId) || isAdmin())
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'bio', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // --- Collection: Public Profiles (No PII) ---
+    match /publicProfiles/{userId} {
+      allow get: if isSignedIn() && isValidId(userId);
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidPublicProfile(incoming())
+        && isOwner(userId)
+        && incoming().uid == userId
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidPublicProfile(incoming())
+        && (isOwner(userId) || isAdmin())
+        && incoming().uid == existing().uid
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'bio', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // --- Collection: Works / Uploaded Files ---
+    match /works/{workId} {
+      allow get: if isSignedIn()
+        && isValidId(workId)
+        && (existing().visibility == 'public' || existing().authorId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn()
+        && (resource.data.visibility == 'public' || resource.data.authorId == request.auth.uid || isAdmin());
+
+      allow create: if isVerifiedUser()
+        && isValidId(workId)
+        && isValidWorkItem(incoming())
+        && incoming().id == workId
+        && incoming().authorId == request.auth.uid
+        && incoming().likesCount == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser()
+        && isValidId(workId)
+        && isValidWorkItem(incoming())
+        && incoming().id == existing().id
+        && incoming().authorId == existing().authorId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Owner or Admin editing work metadata & visibility
+          (
+            (existing().authorId == request.auth.uid || isAdmin())
+            && incoming().likesCount == existing().likesCount
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'description', 'category', 'visibility', 'externalUrl', 'updatedAt'
+            ])
+          )
+          ||
+          // Action 2: Atomic Like (+1 synced with likes/{uid})
+          (
+            (existing().visibility == 'public' || existing().authorId == request.auth.uid)
+            && incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'updatedAt'])
+            && incoming().likesCount == existing().likesCount + 1
+            && !exists(/databases/$(database)/documents/works/$(workId)/likes/$(request.auth.uid))
+            && existsAfter(/databases/$(database)/documents/works/$(workId)/likes/$(request.auth.uid))
+          )
+          ||
+          // Action 3: Atomic Unlike (-1 synced with likes/{uid})
+          (
+            (existing().visibility == 'public' || existing().authorId == request.auth.uid)
+            && incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'updatedAt'])
+            && incoming().likesCount == existing().likesCount - 1
+            && incoming().likesCount >= 0
+            && exists(/databases/$(database)/documents/works/$(workId)/likes/$(request.auth.uid))
+            && !existsAfter(/databases/$(database)/documents/works/$(workId)/likes/$(request.auth.uid))
+          )
+        );
+
+      allow delete: if isVerifiedUser()
+        && isValidId(workId)
+        && (existing().authorId == request.auth.uid || isAdmin());
+
+      // --- Subcollection: File Chunks (Master Gate) ---
+      match /chunks/{chunkId} {
+        allow get: if isSignedIn()
+          && isValidId(workId)
+          && isValidId(chunkId)
+          && exists(/databases/$(database)/documents/works/$(workId))
+          && (
+            get(/databases/$(database)/documents/works/$(workId)).data.visibility == 'public'
+            || get(/databases/$(database)/documents/works/$(workId)).data.authorId == request.auth.uid
+            || isAdmin()
+          );
+
+        allow create: if isVerifiedUser()
+          && isValidId(workId)
+          && isValidId(chunkId)
+          && isValidFileChunk(incoming())
+          && incoming().workId == workId
+          && incoming().authorId == request.auth.uid
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/works/$(workId))
+          && get(/databases/$(database)/documents/works/$(workId)).data.authorId == request.auth.uid;
+
+        allow update: if false;
+
+        allow delete: if isVerifiedUser()
+          && isValidId(workId)
+          && isValidId(chunkId)
+          && (
+            existing().authorId == request.auth.uid
+            || !exists(/databases/$(database)/documents/works/$(workId))
+            || get(/databases/$(database)/documents/works/$(workId)).data.authorId == request.auth.uid
+            || isAdmin()
+          );
+      }
+
+      // --- Subcollection: Likes (Atomic with parent likesCount) ---
+      match /likes/{likeUserId} {
+        allow get: if isSignedIn()
+          && isValidId(workId)
+          && isValidId(likeUserId)
+          && (
+            likeUserId == request.auth.uid
+            || get(/databases/$(database)/documents/works/$(workId)).data.visibility == 'public'
+            || get(/databases/$(database)/documents/works/$(workId)).data.authorId == request.auth.uid
+            || isAdmin()
+          );
+
+        allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+        allow create: if isVerifiedUser()
+          && isValidId(workId)
+          && isValidId(likeUserId)
+          && isValidWorkLike(incoming())
+          && likeUserId == request.auth.uid
+          && incoming().userId == request.auth.uid
+          && incoming().workId == workId
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/works/$(workId))
+          && (
+            get(/databases/$(database)/documents/works/$(workId)).data.visibility == 'public'
+            || get(/databases/$(database)/documents/works/$(workId)).data.authorId == request.auth.uid
+          )
+          && getAfter(/databases/$(database)/documents/works/$(workId)).data.likesCount == get(/databases/$(database)/documents/works/$(workId)).data.likesCount + 1;
+
+        allow update: if false;
+
+        allow delete: if isVerifiedUser()
+          && isValidId(workId)
+          && isValidId(likeUserId)
+          && (
+            (
+              likeUserId == request.auth.uid
+              && exists(/databases/$(database)/documents/works/$(workId))
+              && getAfter(/databases/$(database)/documents/works/$(workId)).data.likesCount == get(/databases/$(database)/documents/works/$(workId)).data.likesCount - 1
+            )
+            || isAdmin()
+            || !exists(/databases/$(database)/documents/works/$(workId))
+            || get(/databases/$(database)/documents/works/$(workId)).data.authorId == request.auth.uid
+          );
+      }
+
+      // --- Subcollection: Comments ---
+      match /comments/{commentId} {
+        allow get: if isSignedIn()
+          && isValidId(workId)
+          && isValidId(commentId)
+          && exists(/databases/$(database)/documents/works/$(workId))
+          && (
+            get(/databases/$(database)/documents/works/$(workId)).data.visibility == 'public'
+            || get(/databases/$(database)/documents/works/$(workId)).data.authorId == request.auth.uid
+            || isAdmin()
+          );
+
+        allow list: if isSignedIn()
+          && (resource.data.workVisibility == 'public' || resource.data.authorId == request.auth.uid || isAdmin());
+
+        allow create: if isVerifiedUser()
+          && isValidId(workId)
+          && isValidId(commentId)
+          && isValidWorkComment(incoming())
+          && incoming().id == commentId
+          && incoming().workId == workId
+          && incoming().authorId == request.auth.uid
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/works/$(workId))
+          && incoming().workVisibility == get(/databases/$(database)/documents/works/$(workId)).data.visibility
+          && (
+            get(/databases/$(database)/documents/works/$(workId)).data.visibility == 'public'
+            || get(/databases/$(database)/documents/works/$(workId)).data.authorId == request.auth.uid
+          );
+
+        allow update: if false;
+
+        allow delete: if isVerifiedUser()
+          && isValidId(workId)
+          && isValidId(commentId)
+          && (
+            existing().authorId == request.auth.uid
+            || isAdmin()
+            || !exists(/databases/$(database)/documents/works/$(workId))
+            || get(/databases/$(database)/documents/works/$(workId)).data.authorId == request.auth.uid
+          );
+      }
+    }
+  }
+}

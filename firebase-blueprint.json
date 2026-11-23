@@ -1,0 +1,304 @@
+{
+  "entities": {
+    "UserPrivate": {
+      "title": "UserPrivate",
+      "description": "Private user account profile containing PII isolated from public views.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "bio": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "displayName", "photoURL", "bio", "createdAt", "updatedAt"]
+    },
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Public creator profile without PII for community attribution.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "bio": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "photoURL", "bio", "updatedAt"]
+    },
+    "WorkItem": {
+      "title": "WorkItem",
+      "description": "A user-uploaded file or completed work stored in Firebase, either private or shared to the community.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "authorPhotoURL": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 140
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "category": {
+          "type": "string",
+          "enum": ["design", "code", "document", "media", "other"]
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public", "private"]
+        },
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "fileSize": {
+          "type": "integer"
+        },
+        "chunkCount": {
+          "type": "integer"
+        },
+        "previewDataUrl": {
+          "type": "string",
+          "maxLength": 250000
+        },
+        "externalUrl": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "likesCount": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "authorId",
+        "authorName",
+        "authorPhotoURL",
+        "title",
+        "description",
+        "category",
+        "visibility",
+        "fileName",
+        "mimeType",
+        "fileSize",
+        "chunkCount",
+        "previewDataUrl",
+        "externalUrl",
+        "likesCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FileChunk": {
+      "title": "FileChunk",
+      "description": "Ordered base64 chunk of an uploaded file belonging to a WorkItem.",
+      "type": "object",
+      "properties": {
+        "workId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "index": {
+          "type": "integer"
+        },
+        "data": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 750000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["workId", "authorId", "index", "data", "createdAt"]
+    },
+    "WorkLike": {
+      "title": "WorkLike",
+      "description": "A user's like on a public work item, synced atomically with likesCount.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "workId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "workId", "createdAt"]
+    },
+    "WorkComment": {
+      "title": "WorkComment",
+      "description": "A community comment on a work item.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "workId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "authorPhotoURL": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "workVisibility": {
+          "type": "string",
+          "enum": ["public", "private"]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "workId", "authorId", "authorName", "authorPhotoURL", "workVisibility", "text", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserPrivate" },
+      "description": "Private user profile isolated to the account owner and admin."
+    },
+    "/publicProfiles/{userId}": {
+      "schema": { "$ref": "#/entities/PublicProfile" },
+      "description": "Public creator profile without PII for displaying community authors."
+    },
+    "/works/{workId}": {
+      "schema": { "$ref": "#/entities/WorkItem" },
+      "description": "Uploaded files and creative works; private works are owner-only, public works appear in Community."
+    },
+    "/works/{workId}/chunks/{chunkId}": {
+      "schema": { "$ref": "#/entities/FileChunk" },
+      "description": "Ordered base64 file content chunks guarded by parent WorkItem visibility/ownership."
+    },
+    "/works/{workId}/likes/{likeUserId}": {
+      "schema": { "$ref": "#/entities/WorkLike" },
+      "description": "Like records synced atomically with parent WorkItem.likesCount."
+    },
+    "/works/{workId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/WorkComment" },
+      "description": "Comments on public or owned works."
+    }
+  }
+}
